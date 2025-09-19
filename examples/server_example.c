@@ -33,12 +33,12 @@ int main() {
     printf("服务器Socket创建成功: fd=%d\n", listen_fd);
     
     /* 绑定地址 */
-    struct sockaddr_in server_addr;
+    struct mysocket_addr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr = 0;  /* INADDR_ANY - 监听所有接口 */
     server_addr.sin_port = mysocket_htons(SERVER_PORT);
     
-    if (mysocket_bind(listen_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) != 0) {
+    if (mysocket_bind(listen_fd, (struct mysocket_addr*)&server_addr, sizeof(server_addr)) != 0) {
         printf("地址绑定失败: %s\n", mysocket_strerror(socket_get_error()));
         mysocket_close(listen_fd);
         mysocket_cleanup();
@@ -63,12 +63,12 @@ int main() {
     
     /* 接受连接循环 */
     for (int i = 0; i < 3; i++) {  /* 模拟处理3个连接 */
-        struct sockaddr_in client_addr;
+        struct mysocket_addr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
         printf("[%d] 等待客户端连接...\n", i + 1);
         
-        int client_fd = mysocket_accept(listen_fd, (struct sockaddr*)&client_addr, &client_len);
+        int client_fd = mysocket_accept(listen_fd, (struct mysocket_addr*)&client_addr, &client_len);
         if (client_fd < 0) {
             printf("[%d] 接受连接失败: %s\n", i + 1, mysocket_strerror(socket_get_error()));
             continue;

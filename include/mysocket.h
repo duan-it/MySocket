@@ -13,6 +13,9 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+/* 自定义类型定义 */
+typedef uint32_t socklen_t;
+
 /* 协议族定义 - 模仿Linux内核 */
 #define PF_UNSPEC       0       /* 未指定 */
 #define PF_UNIX         1       /* Unix域套接字 */
@@ -60,8 +63,8 @@ typedef enum {
     TCP_CLOSING                /* 正在关闭 */
 } tcp_state_t;
 
-/* IPv4地址结构 - 模仿Linux内核 */
-struct sockaddr_in {
+/* IPv4地址结构 - 自定义实现 */
+struct mysocket_addr_in {
     uint16_t sin_family;        /* 地址族 AF_INET */
     uint16_t sin_port;          /* 端口号（网络字节序） */
     uint32_t sin_addr;          /* IPv4地址（网络字节序） */
@@ -69,7 +72,7 @@ struct sockaddr_in {
 };
 
 /* 通用地址结构 */
-struct sockaddr {
+struct mysocket_addr {
     uint16_t sa_family;         /* 地址族 */
     char sa_data[14];           /* 地址数据 */
 };
@@ -84,8 +87,8 @@ struct mysocket {
     tcp_state_t tcp_state;      /* TCP状态（如果是TCP） */
     
     /* 地址信息 */
-    struct sockaddr_in local_addr;   /* 本地地址 */
-    struct sockaddr_in peer_addr;    /* 对端地址 */
+    struct mysocket_addr_in local_addr;   /* 本地地址 */
+    struct mysocket_addr_in peer_addr;    /* 对端地址 */
     
     /* 缓冲区 */
     char *send_buffer;          /* 发送缓冲区 */
@@ -128,19 +131,19 @@ void mysocket_cleanup(void);
 
 /* 基本Socket操作 */
 int mysocket_socket(int domain, int type, int protocol);
-int mysocket_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int mysocket_bind(int sockfd, const struct mysocket_addr *addr, socklen_t addrlen);
 int mysocket_listen(int sockfd, int backlog);
-int mysocket_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-int mysocket_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int mysocket_accept(int sockfd, struct mysocket_addr *addr, socklen_t *addrlen);
+int mysocket_connect(int sockfd, const struct mysocket_addr *addr, socklen_t addrlen);
 int mysocket_close(int sockfd);
 
 /* 数据收发 */
 ssize_t mysocket_send(int sockfd, const void *buf, size_t len, int flags);
 ssize_t mysocket_recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t mysocket_sendto(int sockfd, const void *buf, size_t len, int flags,
-                       const struct sockaddr *dest_addr, socklen_t addrlen);
+                       const struct mysocket_addr *dest_addr, socklen_t addrlen);
 ssize_t mysocket_recvfrom(int sockfd, void *buf, size_t len, int flags,
-                         struct sockaddr *src_addr, socklen_t *addrlen);
+                         struct mysocket_addr *src_addr, socklen_t *addrlen);
 
 /* 辅助函数 */
 const char* mysocket_strerror(int error_code);

@@ -34,7 +34,7 @@ int main() {
     printf("客户端Socket创建成功: fd=%d\n", client_fd);
     
     /* 准备服务器地址 */
-    struct sockaddr_in server_addr;
+    struct mysocket_addr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr = mysocket_inet_addr(SERVER_IP);
     server_addr.sin_port = mysocket_htons(SERVER_PORT);
@@ -42,7 +42,7 @@ int main() {
     printf("准备连接到服务器: %s:%d\n", SERVER_IP, SERVER_PORT);
     
     /* 连接到服务器 */
-    if (mysocket_connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) != 0) {
+    if (mysocket_connect(client_fd, (struct mysocket_addr*)&server_addr, sizeof(server_addr)) != 0) {
         printf("连接服务器失败: %s\n", mysocket_strerror(socket_get_error()));
         mysocket_close(client_fd);
         mysocket_cleanup();

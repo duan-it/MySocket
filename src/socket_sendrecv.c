@@ -130,7 +130,7 @@ ssize_t mysocket_recv(int sockfd, void *buf, size_t len, int flags) {
  * @return 发送的字节数，失败返回-1
  */
 ssize_t mysocket_sendto(int sockfd, const void *buf, size_t len, int flags,
-                       const struct sockaddr *dest_addr, socklen_t addrlen) {
+                       const struct mysocket_addr *dest_addr, socklen_t addrlen) {
     DEBUG_PRINT("发送数据到指定地址: fd=%d, len=%zu", sockfd, len);
     
     /* 查找Socket */
@@ -141,7 +141,7 @@ ssize_t mysocket_sendto(int sockfd, const void *buf, size_t len, int flags,
     }
     
     /* 参数验证 */
-    if (!buf || len == 0 || !dest_addr || addrlen < sizeof(struct sockaddr_in)) {
+    if (!buf || len == 0 || !dest_addr || addrlen < sizeof(struct mysocket_addr_in)) {
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
@@ -153,7 +153,7 @@ ssize_t mysocket_sendto(int sockfd, const void *buf, size_t len, int flags,
     }
     
     /* 临时保存原对端地址 */
-    struct sockaddr_in original_peer = sock->peer_addr;
+    struct mysocket_addr_in original_peer = sock->peer_addr;
     
     /* 设置目标地址 */
     if (socket_addr_copy(&sock->peer_addr, dest_addr, addrlen) < 0) {
@@ -188,7 +188,7 @@ ssize_t mysocket_sendto(int sockfd, const void *buf, size_t len, int flags,
  * @return 接收的字节数，失败返回-1
  */
 ssize_t mysocket_recvfrom(int sockfd, void *buf, size_t len, int flags,
-                         struct sockaddr *src_addr, socklen_t *addrlen) {
+                         struct mysocket_addr *src_addr, socklen_t *addrlen) {
     DEBUG_PRINT("从指定地址接收数据: fd=%d, len=%zu", sockfd, len);
     
     /* 查找Socket */
@@ -211,7 +211,7 @@ ssize_t mysocket_recvfrom(int sockfd, void *buf, size_t len, int flags,
     }
     
     /* 接收UDP数据包 */
-    struct sockaddr_in peer_addr;
+    struct mysocket_addr_in peer_addr;
     ssize_t result = socket_recv_udp_packet(sock, buf, len, &peer_addr);
     
     if (result < 0) {
@@ -220,9 +220,9 @@ ssize_t mysocket_recvfrom(int sockfd, void *buf, size_t len, int flags,
     }
     
     /* 返回源地址信息 */
-    if (src_addr && addrlen && *addrlen >= sizeof(struct sockaddr_in)) {
-        memcpy(src_addr, &peer_addr, sizeof(struct sockaddr_in));
-        *addrlen = sizeof(struct sockaddr_in);
+    if (src_addr && addrlen && *addrlen >= sizeof(struct mysocket_addr_in)) {
+        memcpy(src_addr, &peer_addr, sizeof(struct mysocket_addr_in));
+        *addrlen = sizeof(struct mysocket_addr_in);
     }
     
     DEBUG_PRINT("UDP数据接收成功: fd=%d, recv=%zd", sockfd, result);
@@ -287,7 +287,7 @@ int socket_fill_recv_buffer(struct mysocket *sock) {
         recv_len = socket_simulate_tcp_receive(sock, temp_data, sizeof(temp_data));
     } else if (sock->protocol == IPPROTO_UDP) {
         /* 模拟UDP数据接收 */
-        struct sockaddr_in peer_addr;
+        struct mysocket_addr_in peer_addr;
         recv_len = socket_recv_udp_packet(sock, temp_data, sizeof(temp_data), &peer_addr);
     }
     
@@ -348,7 +348,7 @@ ssize_t socket_send_udp_packet(struct mysocket *sock, const void *data, size_t l
  * @return 接收的字节数，-1表示失败
  */
 ssize_t socket_recv_udp_packet(struct mysocket *sock, void *buf, size_t len,
-                              struct sockaddr_in *src_addr) {
+                              struct mysocket_addr_in *src_addr) {
     if (!sock || !buf || len == 0) return -1;
     
     /* 模拟UDP数据接收 */
@@ -385,7 +385,7 @@ ssize_t socket_recv_udp_packet(struct mysocket *sock, void *buf, size_t len,
  * @param addr 目标地址
  * @return Socket指针，未找到返回NULL
  */
-struct mysocket* socket_find_udp_receiver(const struct sockaddr_in *addr) {
+struct mysocket* socket_find_udp_receiver(const struct mysocket_addr_in *addr) {
     if (!addr) return NULL;
     
     struct mysocket *current = g_socket_manager.socket_list;

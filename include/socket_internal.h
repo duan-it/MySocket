@@ -16,6 +16,8 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
+#include <pthread.h>
 
 /* 调试宏定义 */
 #ifdef DEBUG
@@ -101,9 +103,9 @@ int socket_add_to_manager(struct mysocket *sock);
 void socket_remove_from_manager(struct mysocket *sock);
 
 /* 地址处理 */
-int socket_addr_copy(struct sockaddr_in *dst, const struct sockaddr *src, socklen_t addrlen);
-int socket_addr_compare(const struct sockaddr_in *addr1, const struct sockaddr_in *addr2);
-int socket_addr_is_any(const struct sockaddr_in *addr);
+int socket_addr_copy(struct mysocket_addr_in *dst, const struct mysocket_addr *src, socklen_t addrlen);
+int socket_addr_compare(const struct mysocket_addr_in *addr1, const struct mysocket_addr_in *addr2);
+int socket_addr_is_any(const struct mysocket_addr_in *addr);
 
 /* 缓冲区管理 */
 int socket_buffer_init(struct mysocket *sock);
@@ -145,7 +147,7 @@ uint16_t tcp_checksum(struct ip_header *ip_hdr, struct tcp_header *tcp_hdr,
 #define TCP_EVENT_TIMEOUT       8
 
 /* 地址处理扩展 */
-int socket_check_addr_in_use(const struct sockaddr_in *addr);
+int socket_check_addr_in_use(const struct mysocket_addr_in *addr, int exclude_fd);
 int socket_listen_queue_add(struct mysocket *listen_sock, struct mysocket *new_sock);
 struct mysocket* socket_listen_queue_remove(struct mysocket *listen_sock);
 int socket_listen_queue_status(struct mysocket *listen_sock, int *count, int *backlog);
@@ -154,8 +156,8 @@ int socket_listen_queue_status(struct mysocket *listen_sock, int *count, int *ba
 int socket_auto_bind(struct mysocket *sock);
 int socket_simulate_tcp_handshake(struct mysocket *sock);
 struct mysocket* socket_simulate_incoming_connection(struct mysocket *listen_sock);
-struct mysocket* socket_find_listening_socket(const struct sockaddr_in *addr);
-int socket_can_accept_connection(struct mysocket *listen_sock, const struct sockaddr_in *peer_addr);
+struct mysocket* socket_find_listening_socket(const struct mysocket_addr_in *addr);
+int socket_can_accept_connection(struct mysocket *listen_sock, const struct mysocket_addr_in *peer_addr);
 
 /* 缓冲区扩展功能 */
 int socket_buffer_resize(struct mysocket *sock, size_t send_size, size_t recv_size);
@@ -169,20 +171,20 @@ int socket_flush_send_buffer(struct mysocket *sock);
 int socket_fill_recv_buffer(struct mysocket *sock);
 ssize_t socket_send_udp_packet(struct mysocket *sock, const void *data, size_t len);
 ssize_t socket_recv_udp_packet(struct mysocket *sock, void *buf, size_t len,
-                              struct sockaddr_in *src_addr);
-struct mysocket* socket_find_udp_receiver(const struct sockaddr_in *addr);
+                              struct mysocket_addr_in *src_addr);
+struct mysocket* socket_find_udp_receiver(const struct mysocket_addr_in *addr);
 size_t socket_simulate_tcp_receive(struct mysocket *sock, void *buf, size_t len);
 
 /* 地址查找和管理 */
-struct mysocket* socket_find_by_address(const struct sockaddr_in *addr);
+struct mysocket* socket_find_by_address(const struct mysocket_addr_in *addr);
 
 /* 辅助工具函数 */
-struct sockaddr_in mysocket_make_addr(const char *ip, uint16_t port);
-int mysocket_addr_is_valid(const struct sockaddr_in *addr);
-int mysocket_addr_equal(const struct sockaddr_in *addr1, const struct sockaddr_in *addr2);
+struct mysocket_addr_in mysocket_make_addr(const char *ip, uint16_t port);
+int mysocket_addr_is_valid(const struct mysocket_addr_in *addr);
+int mysocket_addr_equal(const struct mysocket_addr_in *addr1, const struct mysocket_addr_in *addr2);
 uint16_t mysocket_random_port(void);
 int mysocket_port_in_use(uint16_t port);
-void mysocket_addr_to_string(const struct sockaddr_in *addr, char *buf, size_t len);
+void mysocket_addr_to_string(const struct mysocket_addr_in *addr, char *buf, size_t len);
 
 /* 辅助工具 */
 void socket_print_debug_info(struct mysocket *sock, const char *msg);

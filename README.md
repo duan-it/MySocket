@@ -1,21 +1,26 @@
 # MySocket - Socket 底层实现学习项目
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![C](https://img.shields.io/badge/language-C-brightgreen.svg)
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey.svg)
+![C](https://img.shields.io/badge/language-C99-brightgreen.svg)
+![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
+![Build](https://img.shields.io/badge/build-passing-success.svg)
 
 ## 项目简介
 
-MySocket 是一个用 C 语言编写的 Socket 套接字学习项目，模仿 Linux 内核的实现方式，旨在帮助理解 Socket 的底层原理和网络编程的核心概念。
+MySocket 是一个用 C99 标准编写的 Socket 套接字学习项目，完全模拟 Linux Socket API 的实现方式，旨在帮助深入理解网络编程的底层原理和 Socket 的工作机制。
+
+本项目通过自定义实现所有核心组件，提供了一个完整的、可运行的 Socket 系统，非常适合用于学习网络编程概念和调试网络应用。
 
 ### 主要特性
 
-- ✅ **完整的 Socket API 实现**：包含 socket、bind、listen、accept、connect、send、recv 等核心函数
-- ✅ **TCP/UDP 协议支持**：实现了基础的 TCP 状态机和 UDP 数据报传输
-- ✅ **内存管理**：自动管理 Socket 生命周期和缓冲区
-- ✅ **错误处理**：完善的错误码和错误信息系统
-- ✅ **线程安全**：使用互斥锁保护关键数据结构
-- ✅ **调试支持**：内置调试信息输出和状态查看功能
+- ✅ **完整的 Socket API 实现**：mysocket_socket、mysocket_bind、mysocket_listen、mysocket_accept、mysocket_connect、mysocket_send、mysocket_recv 等
+- ✅ **TCP/UDP 协议支持**：实现了完整的 TCP 状态机和 UDP 数据报传输
+- ✅ **智能内存管理**：自动管理 Socket 生命周期、缓冲区分配和释放
+- ✅ **强大的错误处理**：详细的错误码系统和错误信息提示
+- ✅ **线程安全设计**：使用互斥锁保护关键数据结构
+- ✅ **丰富的调试支持**：内置 DEBUG 宏系统，可详细追踪所有操作
+- ✅ **地址冲突检测**：智能检测端口占用和地址绑定冲突
+- ✅ **自动端口分配**：支持客户端自动绑定可用端口
 
 ## 项目结构
 
@@ -59,22 +64,38 @@ mysocket/
    cd mysocket
    ```
 
-2. **编译项目**
+2. **编译静态库**
    ```bash
-   make all
+   make libmysocket
    ```
 
-3. **运行测试**
+3. **运行基础测试**
    ```bash
    make test
    ```
+   
+   测试将验证以下功能：
+   - Socket 创建和关闭
+   - 地址绑定和冲突检测  
+   - TCP 监听和连接接受
+   - TCP 数据收发
+   - UDP 数据报传输
+   - 辅助函数（地址转换、字节序等）
 
-4. **运行示例**
+4. **开启调试模式**
    ```bash
+   make CFLAGS="-DDEBUG -Wall -Wextra -g -std=c99 -Iinclude" test
+   ```
+   
+5. **运行示例程序**
+   ```bash
+   # 编译示例程序
+   make examples
+   
    # 运行 TCP 服务器示例
    ./bin/server_example
    
-   # 运行 TCP 客户端示例
+   # 运行 TCP 客户端示例  
    ./bin/client_example
    
    # 运行 UDP 通信示例
@@ -113,85 +134,211 @@ mysocket_cleanup();
 ### 2. TCP 服务器示例
 
 ```c
-// 创建 TCP Socket
-int server_fd = mysocket_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#include "mysocket.h"
+#include <stdio.h>
 
-// 绑定地址
-struct sockaddr_in addr;
-addr.sin_family = AF_INET;
-addr.sin_addr = 0;  // INADDR_ANY
-addr.sin_port = mysocket_htons(8080);
-mysocket_bind(server_fd, (struct sockaddr*)&addr, sizeof(addr));
+int main() {
+    // 初始化 Socket 系统
+    if (mysocket_init() != 0) {
+        printf("Socket 系统初始化失败\n");
+        return -1;
+    }
+    
+    // 创建 TCP Socket
+    int server_fd = mysocket_socket(MYSOCKET_AF_INET, MYSOCKET_SOCK_STREAM, MYSOCKET_IPPROTO_TCP);
+    if (server_fd < 0) {
+        printf("Socket 创建失败\n");
+        return -1;
+    }
 
-// 开始监听
-mysocket_listen(server_fd, 5);
+    // 绑定地址 - 使用通配地址监听所有接口
+    struct mysocket_addr_in addr;
+    addr.sin_family = MYSOCKET_AF_INET;
+    addr.sin_addr = 0;  // INADDR_ANY - 监听所有网络接口
+    addr.sin_port = mysocket_htons(8080);
+    
+    if (mysocket_bind(server_fd, (struct mysocket_addr*)&addr, sizeof(addr)) != 0) {
+        printf("地址绑定失败\n");
+        mysocket_close(server_fd);
+        return -1;
+    }
 
-// 接受连接
-struct sockaddr_in client_addr;
-socklen_t client_len = sizeof(client_addr);
-int client_fd = mysocket_accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+    // 开始监听，最大挂起连接数为 5
+    if (mysocket_listen(server_fd, 5) != 0) {
+        printf("监听失败\n");
+        mysocket_close(server_fd);
+        return -1;
+    }
+    
+    printf("服务器正在监听端口 8080...\n");
 
-// 数据收发
-char buffer[1024];
-ssize_t received = mysocket_recv(client_fd, buffer, sizeof(buffer), 0);
-mysocket_send(client_fd, "Hello", 5, 0);
+    // 接受客户端连接
+    struct mysocket_addr_in client_addr;
+    mysocket_socklen_t client_len = sizeof(client_addr);
+    int client_fd = mysocket_accept(server_fd, (struct mysocket_addr*)&client_addr, &client_len);
+    
+    if (client_fd >= 0) {
+        printf("客户端连接成功，fd=%d\n", client_fd);
+        
+        // 接收数据
+        char buffer[1024];
+        ssize_t received = mysocket_recv(client_fd, buffer, sizeof(buffer)-1, 0);
+        if (received > 0) {
+            buffer[received] = '\0';
+            printf("接收到数据: %s\n", buffer);
+        }
+        
+        // 发送响应
+        const char* response = "Hello from MySocket Server!";
+        mysocket_send(client_fd, response, strlen(response), 0);
+        
+        // 关闭客户端连接
+        mysocket_close(client_fd);
+    }
 
-// 关闭连接
-mysocket_close(client_fd);
-mysocket_close(server_fd);
+    // 关闭服务器 Socket
+    mysocket_close(server_fd);
+    
+    // 清理 Socket 系统
+    mysocket_cleanup();
+    return 0;
+}
 ```
 
 ### 3. TCP 客户端示例
 
 ```c
-// 创建 TCP Socket
-int client_fd = mysocket_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#include "mysocket.h"
+#include <stdio.h>
+#include <string.h>
 
-// 连接服务器
-struct sockaddr_in server_addr;
-server_addr.sin_family = AF_INET;
-server_addr.sin_addr = mysocket_inet_addr("127.0.0.1");
-server_addr.sin_port = mysocket_htons(8080);
-mysocket_connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr));
+int main() {
+    // 初始化 Socket 系统
+    if (mysocket_init() != 0) {
+        printf("Socket 系统初始化失败\n");
+        return -1;
+    }
+    
+    // 创建 TCP Socket
+    int client_fd = mysocket_socket(MYSOCKET_AF_INET, MYSOCKET_SOCK_STREAM, MYSOCKET_IPPROTO_TCP);
+    if (client_fd < 0) {
+        printf("Socket 创建失败\n");
+        return -1;
+    }
 
-// 数据收发
-mysocket_send(client_fd, "Hello Server", 12, 0);
-char buffer[1024];
-mysocket_recv(client_fd, buffer, sizeof(buffer), 0);
+    // 设置服务器地址
+    struct mysocket_addr_in server_addr;
+    server_addr.sin_family = MYSOCKET_AF_INET;
+    server_addr.sin_addr = mysocket_inet_addr("127.0.0.1");  // 本地回环地址
+    server_addr.sin_port = mysocket_htons(8080);
 
-// 关闭连接
-mysocket_close(client_fd);
+    // 连接到服务器
+    if (mysocket_connect(client_fd, (struct mysocket_addr*)&server_addr, sizeof(server_addr)) != 0) {
+        printf("连接服务器失败\n");
+        mysocket_close(client_fd);
+        return -1;
+    }
+    
+    printf("成功连接到服务器\n");
+
+    // 发送数据到服务器
+    const char* message = "Hello from MySocket Client!";
+    ssize_t sent = mysocket_send(client_fd, message, strlen(message), 0);
+    if (sent > 0) {
+        printf("发送数据成功: %zd 字节\n", sent);
+    }
+
+    // 接收服务器响应
+    char buffer[1024];
+    ssize_t received = mysocket_recv(client_fd, buffer, sizeof(buffer)-1, 0);
+    if (received > 0) {
+        buffer[received] = '\0';
+        printf("收到服务器响应: %s\n", buffer);
+    }
+
+    // 关闭连接
+    mysocket_close(client_fd);
+    
+    // 清理 Socket 系统
+    mysocket_cleanup();
+    return 0;
+}
 ```
 
 ### 4. UDP 通信示例
 
 ```c
-// 创建 UDP Socket
-int udp_fd = mysocket_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+#include "mysocket.h"
+#include <stdio.h>
+#include <string.h>
 
-// 绑定本地地址
-struct sockaddr_in local_addr;
-local_addr.sin_family = AF_INET;
-local_addr.sin_addr = 0;
-local_addr.sin_port = mysocket_htons(9001);
-mysocket_bind(udp_fd, (struct sockaddr*)&local_addr, sizeof(local_addr));
+int main() {
+    // 初始化 Socket 系统
+    if (mysocket_init() != 0) {
+        printf("Socket 系统初始化失败\n");
+        return -1;
+    }
+    
+    // 创建 UDP Socket
+    int udp_fd = mysocket_socket(MYSOCKET_AF_INET, MYSOCKET_SOCK_DGRAM, MYSOCKET_IPPROTO_UDP);
+    if (udp_fd < 0) {
+        printf("UDP Socket 创建失败\n");
+        return -1;
+    }
 
-// 发送数据到指定地址
-struct sockaddr_in target_addr;
-target_addr.sin_family = AF_INET;
-target_addr.sin_addr = mysocket_inet_addr("127.0.0.1");
-target_addr.sin_port = mysocket_htons(9002);
-mysocket_sendto(udp_fd, "UDP Message", 11, 0, 
-                (struct sockaddr*)&target_addr, sizeof(target_addr));
+    // 设置本地绑定地址
+    struct mysocket_addr_in local_addr;
+    local_addr.sin_family = MYSOCKET_AF_INET;
+    local_addr.sin_addr = MYSOCKET_INADDR_ANY;  // 绑定所有可用接口
+    local_addr.sin_port = mysocket_htons(9001);
 
-// 接收数据
-char buffer[1024];
-struct sockaddr_in src_addr;
-socklen_t src_len = sizeof(src_addr);
-mysocket_recvfrom(udp_fd, buffer, sizeof(buffer), 0,
-                  (struct sockaddr*)&src_addr, &src_len);
+    // 绑定到本地地址
+    if (mysocket_bind(udp_fd, (struct mysocket_addr*)&local_addr, sizeof(local_addr)) != 0) {
+        printf("UDP Socket 绑定失败\n");
+        mysocket_close(udp_fd);
+        return -1;
+    }
+    
+    printf("UDP Socket 绑定到端口 9001\n");
 
-mysocket_close(udp_fd);
+    // 设置目标地址
+    struct mysocket_addr_in target_addr;
+    target_addr.sin_family = MYSOCKET_AF_INET;
+    target_addr.sin_addr = mysocket_inet_addr("127.0.0.1");
+    target_addr.sin_port = mysocket_htons(9002);
+
+    // 发送 UDP 数据报
+    const char* message = "Hello UDP from MySocket!";
+    ssize_t sent = mysocket_sendto(udp_fd, message, strlen(message), 0, 
+                                  (struct mysocket_addr*)&target_addr, sizeof(target_addr));
+    if (sent > 0) {
+        printf("UDP 数据发送成功: %zd 字节\n", sent);
+    }
+
+    // 接收 UDP 数据报
+    char buffer[1024];
+    struct mysocket_addr_in src_addr;
+    mysocket_socklen_t src_len = sizeof(src_addr);
+    
+    printf("等待 UDP 数据...\n");
+    ssize_t received = mysocket_recvfrom(udp_fd, buffer, sizeof(buffer)-1, 0,
+                                        (struct mysocket_addr*)&src_addr, &src_len);
+    
+    if (received > 0) {
+        buffer[received] = '\0';
+        printf("收到 UDP 数据: %s\n", buffer);
+        printf("来源地址: %s:%d\n", 
+               mysocket_inet_ntoa(src_addr.sin_addr), 
+               mysocket_ntohs(src_addr.sin_port));
+    }
+
+    // 关闭 UDP Socket
+    mysocket_close(udp_fd);
+    
+    // 清理 Socket 系统
+    mysocket_cleanup();
+    return 0;
+}
 ```
 
 ## 核心概念解析
@@ -200,20 +347,28 @@ mysocket_close(udp_fd);
 
 ```c
 struct mysocket {
-    int fd;                     // 文件描述符
-    int family;                 // 协议族 (AF_INET)
-    int type;                   // Socket 类型 (SOCK_STREAM/SOCK_DGRAM)
-    int protocol;               // 协议 (IPPROTO_TCP/IPPROTO_UDP)
-    socket_state_t state;       // Socket 状态
-    tcp_state_t tcp_state;      // TCP 状态
+    int fd;                           // 文件描述符
+    int family;                       // 协议族 (MYSOCKET_AF_INET)
+    int type;                         // Socket 类型 (MYSOCKET_SOCK_STREAM/MYSOCKET_SOCK_DGRAM)
+    int protocol;                     // 协议 (MYSOCKET_IPPROTO_TCP/MYSOCKET_IPPROTO_UDP)
+    socket_state_t state;             // Socket 状态
+    tcp_state_t tcp_state;            // TCP 状态
     
-    struct sockaddr_in local_addr;   // 本地地址
-    struct sockaddr_in peer_addr;    // 对端地址
+    struct mysocket_addr_in local_addr;   // 本地地址
+    struct mysocket_addr_in peer_addr;    // 对端地址
     
-    // 缓冲区
-    char *send_buffer;          // 发送缓冲区
-    char *recv_buffer;          // 接收缓冲区
-    // ... 其他字段
+    // 缓冲区管理
+    char *send_buffer;                // 发送缓冲区
+    size_t send_buffer_size;          // 发送缓冲区大小
+    size_t send_buffer_len;           // 已缓冲数据长度
+    
+    char *recv_buffer;                // 接收缓冲区
+    size_t recv_buffer_size;          // 接收缓冲区大小
+    size_t recv_buffer_len;           // 已接收数据长度
+    
+    // 其他属性
+    int flags;                        // Socket 选项标志
+    int backlog;                      // 监听队列长度 (仅用于监听 Socket)
 };
 ```
 

@@ -36,7 +36,7 @@ void test_udp_communication() {
     printf("UDP Socket创建成功: A=%d, B=%d\n", udp_a, udp_b);
     
     /* 绑定地址 */
-    struct sockaddr_in addr_a, addr_b;
+    struct mysocket_addr_in addr_a, addr_b;
     
     /* Socket A 绑定到端口 9001 */
     addr_a.sin_family = AF_INET;
@@ -48,12 +48,12 @@ void test_udp_communication() {
     addr_b.sin_addr = mysocket_inet_addr("127.0.0.1");
     addr_b.sin_port = mysocket_htons(UDP_PORT_B);
     
-    if (mysocket_bind(udp_a, (struct sockaddr*)&addr_a, sizeof(addr_a)) != 0) {
+    if (mysocket_bind(udp_a, (struct mysocket_addr*)&addr_a, sizeof(addr_a)) != 0) {
         printf("绑定Socket A失败\n");
         goto cleanup;
     }
     
-    if (mysocket_bind(udp_b, (struct sockaddr*)&addr_b, sizeof(addr_b)) != 0) {
+    if (mysocket_bind(udp_b, (struct mysocket_addr*)&addr_b, sizeof(addr_b)) != 0) {
         printf("绑定Socket B失败\n");
         goto cleanup;
     }
@@ -74,7 +74,7 @@ void test_udp_communication() {
     printf("A 发送消息: %s\n", msg_a_to_b);
     
     ssize_t sent = mysocket_sendto(udp_a, msg_a_to_b, strlen(msg_a_to_b), 0,
-                                  (struct sockaddr*)&addr_b, sizeof(addr_b));
+                                  (struct mysocket_addr*)&addr_b, sizeof(addr_b));
     if (sent > 0) {
         printf("A 发送成功: %zd 字节\n", sent);
     } else {
@@ -83,11 +83,11 @@ void test_udp_communication() {
     
     /* B 尝试接收 */
     char recv_buffer[BUFFER_SIZE];
-    struct sockaddr_in src_addr;
+    struct mysocket_addr_in src_addr;
     socklen_t src_len = sizeof(src_addr);
     
     ssize_t received = mysocket_recvfrom(udp_b, recv_buffer, sizeof(recv_buffer) - 1, 0,
-                                        (struct sockaddr*)&src_addr, &src_len);
+                                        (struct mysocket_addr*)&src_addr, &src_len);
     if (received > 0) {
         recv_buffer[received] = '\0';
         printf("B 收到消息: %s\n", recv_buffer);
@@ -107,7 +107,7 @@ void test_udp_communication() {
     printf("B 发送消息: %s\n", msg_b_to_a);
     
     sent = mysocket_sendto(udp_b, msg_b_to_a, strlen(msg_b_to_a), 0,
-                          (struct sockaddr*)&addr_a, sizeof(addr_a));
+                          (struct mysocket_addr*)&addr_a, sizeof(addr_a));
     if (sent > 0) {
         printf("B 发送成功: %zd 字节\n", sent);
     } else {
@@ -116,7 +116,7 @@ void test_udp_communication() {
     
     /* A 尝试接收 */
     received = mysocket_recvfrom(udp_a, recv_buffer, sizeof(recv_buffer) - 1, 0,
-                                (struct sockaddr*)&src_addr, &src_len);
+                                (struct mysocket_addr*)&src_addr, &src_len);
     if (received > 0) {
         recv_buffer[received] = '\0';
         printf("A 收到消息: %s\n", recv_buffer);
@@ -145,14 +145,14 @@ void test_udp_communication() {
         printf("[%d] A 发送: %s\n", i + 1, messages[i]);
         
         sent = mysocket_sendto(udp_a, messages[i], strlen(messages[i]), 0,
-                              (struct sockaddr*)&addr_b, sizeof(addr_b));
+                              (struct mysocket_addr*)&addr_b, sizeof(addr_b));
         if (sent > 0) {
             printf("[%d] 发送成功: %zd 字节\n", i + 1, sent);
         }
         
         /* 尝试接收 */
         received = mysocket_recvfrom(udp_b, recv_buffer, sizeof(recv_buffer) - 1, 0,
-                                    (struct sockaddr*)&src_addr, &src_len);
+                                    (struct mysocket_addr*)&src_addr, &src_len);
         if (received > 0) {
             recv_buffer[received] = '\0';
             printf("[%d] B 收到: %s\n", i + 1, recv_buffer);

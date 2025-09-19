@@ -68,7 +68,7 @@ int packet_send(struct packet *pkt) {
     /* 在实际实现中，这里会通过网络接口发送数据包 */
     
     /* 简单模拟：查找目标Socket并投递数据包 */
-    struct sockaddr_in target_addr;
+    struct mysocket_addr_in target_addr;
     target_addr.sin_family = AF_INET;
     target_addr.sin_addr = pkt->ip_hdr.dst_addr;
     target_addr.sin_port = pkt->tcp_hdr.dst_port;
@@ -106,7 +106,7 @@ struct packet* packet_receive(struct mysocket *sock) {
  * @param addr 地址
  * @return Socket指针，未找到返回NULL
  */
-struct mysocket* socket_find_by_address(const struct sockaddr_in *addr) {
+struct mysocket* socket_find_by_address(const struct mysocket_addr_in *addr) {
     if (!addr) return NULL;
     
     struct mysocket *current = g_socket_manager.socket_list;
@@ -240,8 +240,8 @@ void socket_print_debug_info(struct mysocket *sock, const char *msg) {
 /**
  * 创建地址结构
  */
-struct sockaddr_in mysocket_make_addr(const char *ip, uint16_t port) {
-    struct sockaddr_in addr;
+struct mysocket_addr_in mysocket_make_addr(const char *ip, uint16_t port) {
+    struct mysocket_addr_in addr;
     memset(&addr, 0, sizeof(addr));
     
     addr.sin_family = AF_INET;
@@ -259,7 +259,7 @@ struct sockaddr_in mysocket_make_addr(const char *ip, uint16_t port) {
 /**
  * 检查地址是否有效
  */
-int mysocket_addr_is_valid(const struct sockaddr_in *addr) {
+int mysocket_addr_is_valid(const struct mysocket_addr_in *addr) {
     if (!addr) return 0;
     
     return (addr->sin_family == AF_INET) && (addr->sin_port != 0);
@@ -268,8 +268,8 @@ int mysocket_addr_is_valid(const struct sockaddr_in *addr) {
 /**
  * 比较两个地址
  */
-int mysocket_addr_equal(const struct sockaddr_in *addr1, 
-                       const struct sockaddr_in *addr2) {
+int mysocket_addr_equal(const struct mysocket_addr_in *addr1, 
+                       const struct mysocket_addr_in *addr2) {
     if (!addr1 || !addr2) return 0;
     
     return (addr1->sin_family == addr2->sin_family) &&
@@ -310,7 +310,7 @@ int mysocket_port_in_use(uint16_t port) {
 /**
  * 格式化地址为字符串
  */
-void mysocket_addr_to_string(const struct sockaddr_in *addr, char *buf, size_t len) {
+void mysocket_addr_to_string(const struct mysocket_addr_in *addr, char *buf, size_t len) {
     if (!addr || !buf || len == 0) return;
     
     snprintf(buf, len, "%s:%u", 

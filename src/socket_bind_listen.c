@@ -8,7 +8,6 @@
  */
 
 #include "socket_internal.h"
-#include <arpa/inet.h>
 
 /**
  * 绑定Socket到指定地址
@@ -17,41 +16,58 @@
  * @param addrlen 地址结构长度
  * @return 0成功，-1失败
  */
-int mysocket_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+int mysocket_bind(int sockfd, const struct mysocket_addr *addr, socklen_t addrlen) {
     DEBUG_PRINT("绑定Socket: fd=%d", sockfd);
+    DEBUG_PRINT("开始参数检查: addr=%p, addrlen=%u", addr, addrlen);
     
     /* 查找Socket */
     struct mysocket *sock = socket_find_by_fd(sockfd);
     if (!sock) {
+        DEBUG_PRINT("错误: Socket查找失败");
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
+    DEBUG_PRINT("Socket查找成功: fd=%d", sockfd);
     
     /* 参数验证 */
-    if (!addr || addrlen < sizeof(struct sockaddr)) {
+    if (!addr || addrlen < sizeof(struct mysocket_addr_in)) {
+        DEBUG_PRINT("错误: 参数验证失败, addr=%p, addrlen=%u, 需要>=%zu", addr, addrlen, sizeof(struct mysocket_addr_in));
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
+    DEBUG_PRINT("参数验证通过");
     
     /* 检查Socket状态 */
     if (sock->state != SS_UNCONNECTED) {
+        DEBUG_PRINT("错误: Socket状态不正确, 当前state=%d, 需要=%d", sock->state, SS_UNCONNECTED);
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
+    DEBUG_PRINT("Socket状态检查通过, state=%d", sock->state);
     
-    /* 复制地址信息 */
-    if (socket_addr_copy(&sock->local_addr, addr, addrlen) < 0) {
-        socket_set_error(MYSOCKET_EINVAL);
-        return -1;
-    }
-    
-    /* 检查地址是否已被使用（简单检查） */
-    if (!socket_addr_is_any(&sock->local_addr)) {
-        if (socket_check_addr_in_use(&sock->local_addr)) {
+    /* 先检查地址是否已被使用（在复制之前检查） */
+    DEBUG_PRINT("检查地址冲突");
+    const struct mysocket_addr_in *addr_in = (const struct mysocket_addr_in *)addr;
+    if (!socket_addr_is_any(addr_in)) {
+        DEBUG_PRINT("非通配地址，检查是否已被使用");
+        if (socket_check_addr_in_use(addr_in, sock->fd)) {
+            DEBUG_PRINT("错误: 地址已被使用");
             socket_set_error(MYSOCKET_EADDRINUSE);
             return -1;
         }
+        DEBUG_PRINT("地址可用");
+    } else {
+        DEBUG_PRINT("使用通配地址，跳过冲突检查");
     }
+    
+    /* 复制地址信息 */
+    DEBUG_PRINT("开始复制地址信息");
+    if (socket_addr_copy(&sock->local_addr, addr, addrlen) < 0) {
+        DEBUG_PRINT("错误: 地址复制失败");
+        socket_set_error(MYSOCKET_EINVAL);
+        return -1;
+    }
+    DEBUG_PRINT("地址复制成功");
     
     /* 更新Socket状态 */
     sock->state = SS_UNCONNECTED;  /* 绑定后仍然是未连接状态 */
@@ -75,6 +91,7 @@ int mysocket_listen(int sockfd, int backlog) {
     /* 查找Socket */
     struct mysocket *sock = socket_find_by_fd(sockfd);
     if (!sock) {
+        DEBUG_PRINT("错误: Socket查找失败");
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
@@ -138,21 +155,35 @@ int mysocket_listen(int sockfd, int backlog) {
  * @param addrlen 地址长度
  * @return 0成功，-1失败
  */
-int socket_addr_copy(struct sockaddr_in *dst, const struct sockaddr *src, socklen_t addrlen) {
-    if (!dst || !src) return -1;
+int socket_addr_copy(struct mysocket_addr_in *dst, const struct mysocket_addr *src, socklen_t addrlen) {
+    DEBUG_PRINT("socket_addr_copy: dst=%p, src=%p, addrlen=%u", dst, src, addrlen);
+    
+    if (!dst || !src) {
+        DEBUG_PRINT("socket_addr_copy: 空指针错误");
+        return -1;
+    }
     
     /* 检查地址族 */
+    DEBUG_PRINT("socket_addr_copy: 检查地址族, src->sa_family=%u, AF_INET=%u", src->sa_family, AF_INET);
     if (src->sa_family != AF_INET) {
+        DEBUG_PRINT("socket_addr_copy: 地址族不匹配");
         return -1;
     }
     
     /* 检查长度 */
-    if (addrlen < sizeof(struct sockaddr_in)) {
+    DEBUG_PRINT("socket_addr_copy: 检查长度, addrlen=%u, 需要>=%zu", addrlen, sizeof(struct mysocket_addr_in));
+    if (addrlen < sizeof(struct mysocket_addr_in)) {
+        DEBUG_PRINT("socket_addr_copy: 长度不足");
         return -1;
     }
     
     /* 复制地址 */
-    memcpy(dst, src, sizeof(struct sockaddr_in));
+    DEBUG_PRINT("socket_addr_copy: 开始复制地址");
+    const struct mysocket_addr_in *src_in = (const struct mysocket_addr_in *)src;
+    DEBUG_PRINT("socket_addr_copy: 源地址 family=%u, port=%u, addr=0x%x", 
+                src_in->sin_family, src_in->sin_port, src_in->sin_addr);
+    memcpy(dst, src, sizeof(struct mysocket_addr_in));
+    DEBUG_PRINT("socket_addr_copy: 地址复制完成");
     
     return 0;
 }
@@ -163,7 +194,7 @@ int socket_addr_copy(struct sockaddr_in *dst, const struct sockaddr *src, sockle
  * @param addr2 地址2
  * @return 1相同，0不同
  */
-int socket_addr_compare(const struct sockaddr_in *addr1, const struct sockaddr_in *addr2) {
+int socket_addr_compare(const struct mysocket_addr_in *addr1, const struct mysocket_addr_in *addr2) {
     if (!addr1 || !addr2) return 0;
     
     return (addr1->sin_family == addr2->sin_family) &&
@@ -176,7 +207,7 @@ int socket_addr_compare(const struct sockaddr_in *addr1, const struct sockaddr_i
  * @param addr 地址结构
  * @return 1是通配地址，0不是
  */
-int socket_addr_is_any(const struct sockaddr_in *addr) {
+int socket_addr_is_any(const struct mysocket_addr_in *addr) {
     if (!addr) return 0;
     
     return (addr->sin_addr == 0);  /* INADDR_ANY = 0 */
@@ -185,37 +216,56 @@ int socket_addr_is_any(const struct sockaddr_in *addr) {
 /**
  * 检查地址是否已被使用
  * @param addr 要检查的地址
+ * @param exclude_fd 要排除检查的socket fd（-1表示不排除）
  * @return 1已使用，0未使用
  */
-int socket_check_addr_in_use(const struct sockaddr_in *addr) {
+int socket_check_addr_in_use(const struct mysocket_addr_in *addr, int exclude_fd) {
+    DEBUG_PRINT("socket_check_addr_in_use: 检查地址 port=%u, addr=0x%x, 排除fd=%d", addr->sin_port, addr->sin_addr, exclude_fd);
     if (!addr) return 0;
     
     /* 遍历所有Socket，检查是否有相同的绑定地址 */
     struct mysocket *current = g_socket_manager.socket_list;
+    DEBUG_PRINT("socket_check_addr_in_use: 开始遍历Socket列表");
     
     while (current != NULL) {
+        DEBUG_PRINT("socket_check_addr_in_use: 检查Socket fd=%d, local_port=%u, local_addr=0x%x", 
+                    current->fd, current->local_addr.sin_port, current->local_addr.sin_addr);
+        
+        /* 跳过要排除的Socket */
+        if (exclude_fd >= 0 && current->fd == exclude_fd) {
+            DEBUG_PRINT("socket_check_addr_in_use: 跳过排除的Socket fd=%d", current->fd);
+            current = current->next;
+            continue;
+        }
+        
         /* 跳过未绑定的Socket */
         if (current->local_addr.sin_port == 0) {
+            DEBUG_PRINT("socket_check_addr_in_use: 跳过未绑定的Socket fd=%d", current->fd);
             current = current->next;
             continue;
         }
         
         /* 检查端口冲突 */
         if (current->local_addr.sin_port == addr->sin_port) {
+            DEBUG_PRINT("socket_check_addr_in_use: 发现端口冲突! fd=%d使用相同端口%u", current->fd, addr->sin_port);
             /* 如果其中一个是通配地址，则冲突 */
             if (current->local_addr.sin_addr == 0 || addr->sin_addr == 0) {
+                DEBUG_PRINT("socket_check_addr_in_use: 通配地址冲突");
                 return 1;
             }
             
             /* 检查IP地址冲突 */
             if (current->local_addr.sin_addr == addr->sin_addr) {
+                DEBUG_PRINT("socket_check_addr_in_use: IP地址冲突");
                 return 1;
             }
+            DEBUG_PRINT("socket_check_addr_in_use: 端口相同但IP不同，无冲突");
         }
         
         current = current->next;
     }
     
+    DEBUG_PRINT("socket_check_addr_in_use: 未发现地址冲突");
     return 0;
 }
 

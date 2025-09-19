@@ -53,13 +53,13 @@ void test_address_binding() {
     assert(sock >= 0);
     
     /* 准备地址 */
-    struct sockaddr_in addr;
+    struct mysocket_addr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr = mysocket_inet_addr("127.0.0.1");
     addr.sin_port = mysocket_htons(8080);
     
     /* 测试绑定 */
-    int result = mysocket_bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+    int result = mysocket_bind(sock, (struct mysocket_addr*)&addr, sizeof(addr));
     assert(result == 0);
     printf("  地址绑定成功: 127.0.0.1:8080\n");
     
@@ -67,7 +67,7 @@ void test_address_binding() {
     int sock2 = mysocket_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     assert(sock2 >= 0);
     
-    result = mysocket_bind(sock2, (struct sockaddr*)&addr, sizeof(addr));
+    result = mysocket_bind(sock2, (struct mysocket_addr*)&addr, sizeof(addr));
     assert(result == -1);  /* 应该失败 */
     printf("  重复绑定检测通过\n");
     
@@ -90,22 +90,22 @@ void test_listen_accept() {
     assert(listen_sock >= 0);
     
     /* 绑定地址 */
-    struct sockaddr_in addr;
+    struct mysocket_addr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr = 0;  /* INADDR_ANY */
     addr.sin_port = mysocket_htons(8081);
     
-    assert(mysocket_bind(listen_sock, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+    assert(mysocket_bind(listen_sock, (struct mysocket_addr*)&addr, sizeof(addr)) == 0);
     
     /* 开始监听 */
     assert(mysocket_listen(listen_sock, 5) == 0);
     printf("  监听Socket创建成功: port=8081\n");
     
     /* 测试连接（模拟） */
-    struct sockaddr_in client_addr;
+    struct mysocket_addr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     
-    int conn_sock = mysocket_accept(listen_sock, (struct sockaddr*)&client_addr, &client_len);
+    int conn_sock = mysocket_accept(listen_sock, (struct mysocket_addr*)&client_addr, &client_len);
     if (conn_sock >= 0) {
         printf("  模拟连接接受成功: fd=%d\n", conn_sock);
         mysocket_close(conn_sock);
@@ -133,21 +133,21 @@ void test_data_transfer() {
     assert(server_sock >= 0 && client_sock >= 0);
     
     /* 服务端绑定并监听 */
-    struct sockaddr_in server_addr;
+    struct mysocket_addr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr = 0;
     server_addr.sin_port = mysocket_htons(8082);
     
-    assert(mysocket_bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == 0);
+    assert(mysocket_bind(server_sock, (struct mysocket_addr*)&server_addr, sizeof(server_addr)) == 0);
     assert(mysocket_listen(server_sock, 1) == 0);
     
     /* 客户端连接 */
-    struct sockaddr_in target_addr;
+    struct mysocket_addr_in target_addr;
     target_addr.sin_family = AF_INET;
     target_addr.sin_addr = mysocket_inet_addr("127.0.0.1");
     target_addr.sin_port = mysocket_htons(8082);
     
-    int connect_result = mysocket_connect(client_sock, (struct sockaddr*)&target_addr, sizeof(target_addr));
+    int connect_result = mysocket_connect(client_sock, (struct mysocket_addr*)&target_addr, sizeof(target_addr));
     if (connect_result == 0) {
         printf("  客户端连接成功\n");
         
@@ -190,34 +190,34 @@ void test_udp_operations() {
     assert(udp_sock >= 0);
     
     /* 绑定地址 */
-    struct sockaddr_in addr;
+    struct mysocket_addr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr = 0;
     addr.sin_port = mysocket_htons(8083);
     
-    assert(mysocket_bind(udp_sock, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+    assert(mysocket_bind(udp_sock, (struct mysocket_addr*)&addr, sizeof(addr)) == 0);
     printf("  UDP Socket绑定成功: port=8083\n");
     
     /* 测试sendto */
-    struct sockaddr_in target;
+    struct mysocket_addr_in target;
     target.sin_family = AF_INET;
     target.sin_addr = mysocket_inet_addr("127.0.0.1");
     target.sin_port = mysocket_htons(8084);
     
     const char *udp_data = "UDP Test Message";
     ssize_t sent = mysocket_sendto(udp_sock, udp_data, strlen(udp_data), 0,
-                                  (struct sockaddr*)&target, sizeof(target));
+                                  (struct mysocket_addr*)&target, sizeof(target));
     if (sent > 0) {
         printf("  UDP数据发送成功: %zd 字节\n", sent);
     }
     
     /* 测试recvfrom */
     char recv_buf[1024];
-    struct sockaddr_in src_addr;
+    struct mysocket_addr_in src_addr;
     socklen_t src_len = sizeof(src_addr);
     
     ssize_t received = mysocket_recvfrom(udp_sock, recv_buf, sizeof(recv_buf), 0,
-                                        (struct sockaddr*)&src_addr, &src_len);
+                                        (struct mysocket_addr*)&src_addr, &src_len);
     if (received > 0) {
         recv_buf[received] = '\0';
         printf("  UDP数据接收成功: %zd 字节, 内容: %s\n", received, recv_buf);

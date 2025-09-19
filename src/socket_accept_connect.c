@@ -17,7 +17,7 @@
  * @param addrlen 地址结构长度
  * @return 新连接的文件描述符，失败返回-1
  */
-int mysocket_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
+int mysocket_accept(int sockfd, struct mysocket_addr *addr, socklen_t *addrlen) {
     DEBUG_PRINT("接受连接: listen_fd=%d", sockfd);
     
     /* 查找监听Socket */
@@ -51,9 +51,9 @@ int mysocket_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
     }
     
     /* 返回客户端地址信息 */
-    if (addr && addrlen && *addrlen >= sizeof(struct sockaddr_in)) {
-        memcpy(addr, &new_sock->peer_addr, sizeof(struct sockaddr_in));
-        *addrlen = sizeof(struct sockaddr_in);
+    if (addr && addrlen && *addrlen >= sizeof(struct mysocket_addr_in)) {
+        memcpy(addr, &new_sock->peer_addr, sizeof(struct mysocket_addr_in));
+        *addrlen = sizeof(struct mysocket_addr_in);
     }
     
     DEBUG_PRINT("连接接受成功: listen_fd=%d, new_fd=%d, peer=%08x:%d", 
@@ -70,7 +70,7 @@ int mysocket_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
  * @param addrlen 地址结构长度
  * @return 0成功，-1失败
  */
-int mysocket_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+int mysocket_connect(int sockfd, const struct mysocket_addr *addr, socklen_t addrlen) {
     DEBUG_PRINT("主动连接: fd=%d", sockfd);
     
     /* 查找Socket */
@@ -81,7 +81,7 @@ int mysocket_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     }
     
     /* 参数验证 */
-    if (!addr || addrlen < sizeof(struct sockaddr_in)) {
+    if (!addr || addrlen < sizeof(struct mysocket_addr_in)) {
         socket_set_error(MYSOCKET_EINVAL);
         return -1;
     }
@@ -161,7 +161,7 @@ int socket_auto_bind(struct mysocket *sock) {
         sock->local_addr.sin_port = mysocket_htons(next_port);
         
         /* 检查端口是否可用 */
-        if (!socket_check_addr_in_use(&sock->local_addr)) {
+        if (!socket_check_addr_in_use(&sock->local_addr, sock->fd)) {
             DEBUG_PRINT("自动绑定成功: fd=%d, port=%d", sock->fd, next_port);
             next_port++;
             if (next_port > 65535) next_port = 32768;
@@ -260,7 +260,7 @@ struct mysocket* socket_simulate_incoming_connection(struct mysocket *listen_soc
  * @param addr 地址
  * @return 监听Socket指针，未找到返回NULL
  */
-struct mysocket* socket_find_listening_socket(const struct sockaddr_in *addr) {
+struct mysocket* socket_find_listening_socket(const struct mysocket_addr_in *addr) {
     if (!addr) return NULL;
     
     struct mysocket *current = g_socket_manager.socket_list;
@@ -290,7 +290,7 @@ struct mysocket* socket_find_listening_socket(const struct sockaddr_in *addr) {
  * @return 1可接受，0不可接受
  */
 int socket_can_accept_connection(struct mysocket *listen_sock, 
-                               const struct sockaddr_in *peer_addr) {
+                               const struct mysocket_addr_in *peer_addr) {
     if (!listen_sock || !peer_addr) return 0;
     
     /* 检查监听状态 */
